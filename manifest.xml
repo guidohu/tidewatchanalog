@@ -1,0 +1,50 @@
+<?xml version="1.0"?>
+<iq:manifest xmlns:iq="http://www.garmin.com/xml/connectiq" version="3">
+    <iq:application id="02237e96-2d0f-4a0e-9292-34dddcbe9dba" type="watchface" name="@Strings.AppName" entry="TideWatchApp" launcherIcon="@Drawables.LauncherIcon" minApiLevel="3.2.0">
+        <iq:products>
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- short forecast window -->
+            <!-- <iq:product id="descentg1"/> not enough memory -->
+            <iq:product id="fenix843mm"/>
+            <iq:product id="fenix847mm"/>
+            <iq:product id="fenix8pro47mm"/>
+            <iq:product id="fenix8solar47mm"/>
+            <iq:product id="fenix8solar51mm"/>
+            <!-- <iq:product id="instinct2"/> not enough memory -->
+            <!-- <iq:product id="instinct2s"/> not enough memory -->
+            <!-- <iq:product id="instinct2x"/> not enough memory -->
+            <!-- <iq:product id="instinct3solar45mm"/> wrong form factor -->
+            <!-- <iq:product id="instinctcrossover"/> not enough memory -->
+            <!-- <iq:product id="instinctcrossoveramoled"/> not enough memory -->
+            <!-- <iq:product id="instincte40mm"/> not enough memory -->
+            <!-- <iq:product id="instincte45mm"/> not enough memory -->
+            <iq:product id="venu441mm"/>
+        </iq:products>
+        <iq:permissions>
+            <iq:uses-permission id="Background"/>
+            <iq:uses-permission id="Communications"/>
+            <iq:uses-permission id="Positioning"/>
+        </iq:permissions>
+        <iq:languages>
+            <iq:language>deu</iq:language>
+            <iq:language>dut</iq:language>
+            <iq:language>eng</iq:language>
+            <iq:language>fre</iq:language>
+            <iq:language>spa</iq:language>
+        </iq:languages>
+        <iq:barrels>
+            <iq:depends name="KPayClock" version="2.0.0"/>
+        </iq:barrels>
+    </iq:application>
+</iq:manifest>

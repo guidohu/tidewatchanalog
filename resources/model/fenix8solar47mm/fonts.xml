@@ -1,0 +1,5 @@
+<resources>
+    <!-- Graph gridline labels: override to Inter 10px. The base config leaves this at
+         "default", which falls back to the 20px AssistantSmall face. -->
+    <string id="graph_label_font">Inter_10px</string>
+</resources>

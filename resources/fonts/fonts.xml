@@ -1,0 +1,11 @@
+<resources>
+    <font id="AssistantSmall" filename="Assistant_Small/Assistant_Small.fnt" />
+    <font id="Inter_10px" filename="Inter_10px/Inter_px.fnt" antialias="true" />
+    <font id="Inter_12px" filename="Inter_12px/Inter_px.fnt" antialias="true" />
+    <font id="Inter_15px" filename="Inter_15px/Inter_px.fnt" antialias="true" />
+    <font id="Inter_20px" filename="Inter_20px/Inter_px.fnt" antialias="true" />
+    <font id="Inter_30px" filename="Inter_30px/Inter_px.fnt" filter="0123456789.-mft" antialias="true" />
+    <font id="Inter_40px" filename="Inter_40px/Inter_px.fnt" filter="0123456789:" antialias="true" />
+    <font id="Inter_45px" filename="Inter_45px/Inter_px.fnt" filter="0123456789:" antialias="true" />
+    <font id="Inter_50px" filename="Inter_50px/Inter_px.fnt" filter="0123456789:" antialias="true" />
+</resources>
