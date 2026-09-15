@@ -1,0 +1,10 @@
+<resources>
+    <!-- Font sizes for 260x260 screens, shared by every device wired to this directory
+         in monkey.jungle. Tightens the dial text: the base config leaves location and
+         the graph labels at "default", which falls back to the 20px AssistantSmall
+         face, and runs the tide height at 30px. -->
+    <string id="current_tide_font">Inter_20px</string>
+    <string id="tide_extreme_font">Inter_12px</string>
+    <string id="graph_label_font">Inter_10px</string>
+    <string id="location_font">Inter_12px</string>
+</resources>

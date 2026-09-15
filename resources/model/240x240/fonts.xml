@@ -1,0 +1,10 @@
+<resources>
+    <!-- Font sizes for 240x240 screens, shared by every device wired to this directory
+         in monkey.jungle. Seeded as a copy of the 260x260 bucket; tune independently
+         from here. Roles left out (battery, day/date) fall back to the base config,
+         which leaves them at "default" -> the 20px AssistantSmall face. -->
+    <string id="current_tide_font">Inter_20px</string>
+    <string id="tide_extreme_font">Inter_12px</string>
+    <string id="graph_label_font">Inter_10px</string>
+    <string id="location_font">Inter_12px</string>
+</resources>
