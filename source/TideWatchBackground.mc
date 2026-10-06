@@ -551,7 +551,7 @@ class TideWatchBackground extends System.ServiceDelegate {
     function makeTideExtremesRequest() as Void {
         if (isFresh(AppStorageBG.getTideExtremesUpdatedAt(), ConstantsBG.FAST_SYNC_FRESHNESS_THRESHOLD_SEC)) {
             // System.println("Tide extremes data is fresh, skipping.");
-            finalizeSync();
+            makeAstronomyRequest();
             return;
         }
 
