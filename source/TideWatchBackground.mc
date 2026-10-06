@@ -52,6 +52,17 @@ class TideWatchBackground extends System.ServiceDelegate {
     }
 
     /**
+     * Checks whether the background task's memory budget is large enough to also
+     * sync astronomy data (moon phase, sunrise/sunset) without risking the core tide
+     * sync on constrained devices. This is a runtime check of the actual background
+     * task memory, independent of the compile-time 48h/12h forecast window tier.
+     * @return True if the background task has at least 64KB of total memory.
+     */
+    function hasAstronomyMemoryBudget() as Boolean {
+        return System.getSystemStats().totalMemory >= ConstantsBG.ASTRONOMY_MIN_BACKGROUND_MEMORY_BYTES;
+    }
+
+    /**
      * Main background execution callback triggered by temporal events.
      * Sets target location, calculates start/end moments, and triggers the sync chain.
      */
@@ -114,8 +125,9 @@ class TideWatchBackground extends System.ServiceDelegate {
         var weatherNeed = (mApiKey != null && !mApiKey.equals("")) && !isFresh(AppStorageBG.getWeatherUpdatedAt(), ConstantsBG.SLOW_SYNC_FRESHNESS_THRESHOLD_SEC);
         var tideTimelineNeed = !isFresh(AppStorageBG.getTideTimelineUpdatedAt(), ConstantsBG.FAST_SYNC_FRESHNESS_THRESHOLD_SEC);
         var tideExtremesNeed = !isFresh(AppStorageBG.getTideExtremesUpdatedAt(), ConstantsBG.FAST_SYNC_FRESHNESS_THRESHOLD_SEC);
+        var astronomyNeed = hasAstronomyMemoryBudget() && !isFresh(AppStorageBG.getAstronomyUpdatedAt(), ConstantsBG.ASTRONOMY_FRESHNESS_THRESHOLD_SEC);
 
-        if (geocodeNeed || weatherNeed || tideTimelineNeed || tideExtremesNeed) {
+        if (geocodeNeed || weatherNeed || tideTimelineNeed || tideExtremesNeed || astronomyNeed) {
             // System.println("Starting sync process with makePingRequest().");
             logMemoryUsage();
             makePingRequest();
@@ -607,15 +619,93 @@ class TideWatchBackground extends System.ServiceDelegate {
                 AppStorageBG.setTideExtrema(extrema);
                 AppStorageBG.setTideExtremesUpdatedAt(Time.now().value());
                 mDataUpdatedThisRun = true;
-                
-                // Clean exit, successful sync pipeline
-                finalizeSync();
+
+                extrema = null;
+                data = null;
+                makeAstronomyRequest();
                 return;
             }
         }
         
         saveSyncError(responseCode);
         exitBackground(false);
+    }
+
+    /**
+     * Executes the Astronomy request to fetch a 7-day moon phase / sunrise / sunset
+     * forecast. Only runs on devices with enough background memory budget; skipped
+     * entirely (falling straight through to finalizeSync) otherwise, since this is a
+     * decorative overlay that must never block or break the core tide sync.
+     */
+    function makeAstronomyRequest() as Void {
+        if (!hasAstronomyMemoryBudget() || isFresh(AppStorageBG.getAstronomyUpdatedAt(), ConstantsBG.ASTRONOMY_FRESHNESS_THRESHOLD_SEC)) {
+            finalizeSync();
+            return;
+        }
+
+        var url = "https://forecast.wakeandsurf.ch/astronomy";
+        var params = {
+            "lat" => mTargetLat,
+            "lng" => mTargetLon,
+            "date" => Time.now().value()
+        };
+        var options = getRequestOptions(false);
+        // System.println("Requesting Astronomy with: " + url + " parameters: " + params);
+        Communications.makeWebRequest(url, params, options, method(:onReceiveAstronomy));
+    }
+
+    /**
+     * Callback for the Astronomy web request.
+     * Parses the daily [ts, sr, ss, moonPhase] rows into a dense numeric array and
+     * stores them, then completes the sync pipeline. Failures are logged but never
+     * block finalizeSync, since astronomy data is purely decorative.
+     * @param responseCode HTTP status response code.
+     * @param data Parsed JSON response dictionary.
+     */
+    function onReceiveAstronomy(responseCode as Number, data as Dictionary?) as Void {
+        if (responseCode != 200) {
+            System.println("ERROR: Astronomy failed with response code: " + responseCode + ", data: " + data);
+            finalizeSync();
+            return;
+        }
+        logMemoryUsage();
+
+        if (data != null && data instanceof Dictionary && data.hasKey("data")) {
+            var days = data.get("data");
+            if (days instanceof Array) {
+                var daysSize = days.size();
+                var rows = new Array<Array<Number>>[daysSize];
+                var count = 0;
+
+                for (var i = 0; i < daysSize; i++) {
+                    var day = days[i];
+                    if (day instanceof Dictionary) {
+                        var ts = day.get("ts");
+                        var sr = day.get("sr");
+                        var ss = day.get("ss");
+                        var mp = day.get("mp");
+                        if (ts != null && sr != null && ss != null && mp != null) {
+                            var mpScaled = (parseFloatSafe(mp) * 10000.0).toNumber();
+                            rows[count] = [parseNumberSafe(ts), parseNumberSafe(sr), parseNumberSafe(ss), mpScaled];
+                            count++;
+                        }
+                    }
+                }
+
+                if (count > 0) {
+                    if (count < daysSize) {
+                        rows = rows.slice(0, count);
+                    }
+                    AppStorageBG.setAstronomyData(rows);
+                    AppStorageBG.setAstronomyUpdatedAt(Time.now().value());
+                    mDataUpdatedThisRun = true;
+                }
+                rows = null;
+            }
+        }
+
+        data = null;
+        finalizeSync();
     }
 
     /**

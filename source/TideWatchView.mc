@@ -56,6 +56,16 @@ class TideWatchView extends WatchUi.WatchFace {
     const LAYOUT_TIDE_HEIGHT_R = 0.77;
     const LAYOUT_MESSAGE_R = 0.35;
 
+    // Moon phase indicator: a small circle in the gap between the location and swell
+    // summary rows, offset to the left of center (mirroring how battery/day-date
+    // flank the dial center left/right) so it never collides with either centered
+    // text row. Only drawn on devices with enough background memory to have synced
+    // astronomy data in the first place.
+    const LAYOUT_MOON_Y_R = -0.65;
+    const MOON_CIRCLE_X_R = 0.70;
+    const MOON_CIRCLE_RADIUS_PX = 9;
+    const SUNRISE_SUNSET_COLOR = 0xFF8800;
+
     // Dial ring: ticks live between these radii. The day/date block is right-justified
     // just inside the 3 o'clock tick and the battery is left-justified opposite it,
     // just inside the 9 o'clock tick.
@@ -110,6 +120,7 @@ class TideWatchView extends WatchUi.WatchFace {
     var mcTideData as Array<Array<Number>>? = null;
 
     var mcTideExtrema as Array<Array<Number>>? = null;
+    var mcAstronomyData as Array<Array<Number>>? = null;
     var mcWaveData as Array<Array<Number?>>? = null;
     var mcTideUnitApi as Number? = null;
     var mcSwellUnitApi as Number? = null;
@@ -388,6 +399,12 @@ class TideWatchView extends WatchUi.WatchFace {
             drawSwellData(dc, baseColor, hasApiKey);
         }
 
+        // Moon Phase Indicator (only populated on devices with enough background
+        // memory to have synced astronomy data; no-ops otherwise)
+        if (!mInLowPowerMode) {
+            drawMoonPhase(dc, baseColor, now);
+        }
+
         // Graph Section
         drawGraphs(dc, graphColor, baseColor, mCachedShowSwellGraph, now);
 
@@ -462,6 +479,7 @@ class TideWatchView extends WatchUi.WatchFace {
             mcTideData = AppStorage.getTideData();
 
             mcTideExtrema = AppStorage.getTideExtrema();
+            mcAstronomyData = AppStorage.getAstronomyData();
             mcWaveData = AppStorage.getWaveData();
             mcTideUnitApi = AppStorage.getTideUnitApi();
             mcSwellUnitApi = AppStorage.getSwellUnitApi();
@@ -1009,6 +1027,61 @@ class TideWatchView extends WatchUi.WatchFace {
     }
 
     /**
+     * Draws a small circle that fills vertically from empty (new moon) to full (full
+     * moon) proportional to the current moon illumination. Picks the stored
+     * astronomy day whose timestamp is closest to now, converts its lunar-cycle
+     * phase to an illuminated fraction, and no-ops if no astronomy data has been
+     * synced (e.g. on a device below the background memory budget for this feature).
+     * @param dc The device context.
+     * @param baseColor Numeric color code for standard drawing.
+     * @param now Current epoch timestamp.
+     */
+    function drawMoonPhase(dc as Dc, baseColor as Number, now as Number) as Void {
+        if (mcAstronomyData == null || mcAstronomyData.size() == 0) {
+            return;
+        }
+
+        var closest = null;
+        var closestDelta = 999999999;
+        for (var i = 0; i < mcAstronomyData.size(); i++) {
+            var row = mcAstronomyData[i] as Array;
+            var delta = (row[0] as Number) - now;
+            if (delta < 0) {
+                delta = -delta;
+            }
+            if (delta < closestDelta) {
+                closestDelta = delta;
+                closest = row;
+            }
+        }
+        if (closest == null) {
+            return;
+        }
+
+        var mpScaled = closest[3] as Number;
+        var phase = mpScaled / 10000.0;
+        var illum = (1.0 - Math.cos(2.0 * Math.PI * phase)) / 2.0;
+
+        var r = (MOON_CIRCLE_RADIUS_PX * mScale).toNumber();
+        if (r < 4) {
+            r = 4;
+        }
+        var cx = (mCenterX - mDialRadius * MOON_CIRCLE_X_R).toNumber();
+        var cy = dialY(LAYOUT_MOON_Y_R).toNumber();
+        var color = dimmed(baseColor);
+
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        dc.drawCircle(cx, cy, r);
+
+        var fillHeight = (2 * r * illum).toNumber();
+        if (fillHeight > 0) {
+            dc.setClip(cx - r, cy + r - fillHeight, 2 * r, fillHeight);
+            dc.fillCircle(cx, cy, r);
+            dc.clearClip();
+        }
+    }
+
+    /**
      * Draws the main tide elevation curve and optionally overlays swell metrics.
      * Places a red dot representing current time on the timeline grid.
      * @param dc The device context.
@@ -1257,6 +1330,25 @@ class TideWatchView extends WatchUi.WatchFace {
                     }
                 }
 
+                // Draw sunrise/sunset markers (only populated on devices with enough
+                // background memory to have synced astronomy data). A 48h graph window
+                // can span two calendar days, so every stored day's sunrise/sunset that
+                // falls inside the visible window gets its own marker.
+                if (mcAstronomyData != null) {
+                    var use24HourMarker = (mCachedTimeFormatVal == DataKeys.TIME_FORMAT_24_H);
+                    for (var astroIdx = 0; astroIdx < mcAstronomyData.size(); astroIdx++) {
+                        var astroRow = mcAstronomyData[astroIdx] as Array;
+                        var sunriseTs = astroRow[1] as Number;
+                        var sunsetTs = astroRow[2] as Number;
+                        if (sunriseTs >= mMinT && sunriseTs <= mMaxT) {
+                            drawGraphTimeMarker(targetDc, graphMargin, drawWidth, graphY, graphHeight, sunriseTs, SUNRISE_SUNSET_COLOR, use24HourMarker);
+                        }
+                        if (sunsetTs >= mMinT && sunsetTs <= mMaxT) {
+                            drawGraphTimeMarker(targetDc, graphMargin, drawWidth, graphY, graphHeight, sunsetTs, SUNRISE_SUNSET_COLOR, use24HourMarker);
+                        }
+                    }
+                }
+
                 // Draw grid labels on the right side of the watch face on top of everything.
                 // The top of the band reaches into the day/date block, which is drawn over
                 // the graph afterwards, so drop any label that would end up behind it.
@@ -1293,6 +1385,44 @@ class TideWatchView extends WatchUi.WatchFace {
             if (mCachedGraphBitmap != null) {
                 dc.drawBitmap(0, bitmapY, mCachedGraphBitmap);
             }
+        }
+    }
+
+    /**
+     * Draws a dashed vertical marker on the tide/swell graph at a given timestamp
+     * (sunrise or sunset), with a small time label near the top of the dash. The
+     * label is skipped (the dash is kept) when it would collide with the height-grid
+     * labels on the right edge; reuses the same time-to-x mapping and dash/gap loop
+     * as the midnight marker.
+     * @param dc The device context (or buffered bitmap target).
+     * @param graphMargin Left margin of the graph's drawable width.
+     * @param drawWidth Drawable width of the graph.
+     * @param graphY Y coordinate of the graph's baseline.
+     * @param graphHeight Height of the graph band.
+     * @param ts Epoch timestamp to mark.
+     * @param color Numeric color code for the marker.
+     * @param use24Hour True to format the label in 24-hour time.
+     */
+    function drawGraphTimeMarker(dc as Dc, graphMargin as Float, drawWidth as Number, graphY as Float, graphHeight as Float, ts as Number, color as Number, use24Hour as Boolean) as Void {
+        var cx = graphMargin + drawWidth * (ts - mMinT).toFloat() / (mMaxT - mMinT).toFloat();
+        dc.setColor(color, Graphics.COLOR_TRANSPARENT);
+        var dashLen = (4 * mScale).toNumber();
+        var gapLen = (4 * mScale).toNumber();
+        if (dashLen < 2) { dashLen = 2; }
+        if (gapLen < 2) { gapLen = 2; }
+        var startY = graphY - graphHeight;
+        for (var gy = startY; gy < graphY; gy += dashLen + gapLen) {
+            var endY = gy + dashLen;
+            if (endY > graphY) { endY = graphY; }
+            dc.drawLine(cx.toNumber(), gy.toNumber(), cx.toNumber(), endY.toNumber());
+        }
+
+        var info = Gregorian.info(new Time.Moment(ts), Time.FORMAT_SHORT);
+        var hourAmPm = formatHourAmPm(info.hour, use24Hour, false);
+        var label = hourAmPm[0].format(use24Hour ? "%02d" : "%d") + ":" + info.min.format("%02d") + hourAmPm[1];
+        var font = mGraphLabelFont != null ? mGraphLabelFont : ((mFontAssistantSmall != null) ? mFontAssistantSmall : Graphics.FONT_XTINY);
+        if (cx < getRightEdgeX(startY) - (40 * mScale)) {
+            dc.drawText(cx.toNumber(), startY.toNumber(), font, label, Graphics.TEXT_JUSTIFY_CENTER);
         }
     }
 

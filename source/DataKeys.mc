@@ -61,5 +61,14 @@ module DataKeys {
         TIME_FORMAT_12_H = 1,
 
         DATUM_STATION_DEFAULT = 0,
+
+        // Thresholds for classifying a stored astronomy row's scaled moon phase
+        // (mp * 10000, an integer 0..10000) as a "new moon day" or "full moon day".
+        // Mirrors the moonPhaseName() bucketing in the backend's astronomy handler,
+        // scaled by 10000, so the client's classification matches it exactly.
+        MOON_PHASE_NEW_THRESHOLD_LO = 300,
+        MOON_PHASE_NEW_THRESHOLD_HI = 9700,
+        MOON_PHASE_FULL_THRESHOLD_LO = 4700,
+        MOON_PHASE_FULL_THRESHOLD_HI = 5300,
     }
 }

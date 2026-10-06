@@ -420,10 +420,30 @@ class AboutMenu extends WatchUi.Menu2 {
             }
         }
         
+        var astroData = AppStorage.getAstronomyData();
+        var nextNewMoonTs = 0;
+        var nextFullMoonTs = 0;
+        if (astroData != null) {
+            for (var i = 0; i < astroData.size(); i++) {
+                var row = astroData[i] as Array;
+                var mpScaled = row[3] as Number;
+                if (nextNewMoonTs == 0 && (mpScaled < DataKeys.MOON_PHASE_NEW_THRESHOLD_LO || mpScaled >= DataKeys.MOON_PHASE_NEW_THRESHOLD_HI)) {
+                    nextNewMoonTs = row[0] as Number;
+                }
+                if (nextFullMoonTs == 0 && mpScaled >= DataKeys.MOON_PHASE_FULL_THRESHOLD_LO && mpScaled < DataKeys.MOON_PHASE_FULL_THRESHOLD_HI) {
+                    nextFullMoonTs = row[0] as Number;
+                }
+            }
+        }
+        var nextNewMoonStr = formatTime(nextNewMoonTs, "Unknown");
+        var nextFullMoonStr = formatTime(nextFullMoonTs, "Unknown");
+
         addItem(new WatchUi.MenuItem("Version", Version.STRING, "version", {}));
         addItem(new WatchUi.MenuItem("Last Sync", lastSyncStr, "sync", {}));
         addItem(new WatchUi.MenuItem("Next Sync", nextSyncStr, "next_sync", {}));
         addItem(new WatchUi.MenuItem("Station", stationStr, "station", {}));
+        addItem(new WatchUi.MenuItem("Next New Moon", nextNewMoonStr, "next_new_moon", {}));
+        addItem(new WatchUi.MenuItem("Next Full Moon", nextFullMoonStr, "next_full_moon", {}));
         addItem(new WatchUi.MenuItem("openwaters.io", "used for tide data", "ow", {}));
         addItem(new WatchUi.MenuItem("stormglass.io", "used for weather data", "stormglass", {}));
         addItem(new WatchUi.MenuItem("bigdatacloud.com", "used for geo data", "bigdatacloud", {}));

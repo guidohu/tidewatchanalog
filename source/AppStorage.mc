@@ -90,6 +90,17 @@ module AppStorageBG {
         Application.Storage.setValue("tideExtremesUpdatedAt", val);
     }
 
+    public function getAstronomyUpdatedAt() as Number? {
+        return Application.Storage.getValue("astronomyUpdatedAt") as Number?;
+    }
+    public function setAstronomyUpdatedAt(val as Number) as Void {
+        Application.Storage.setValue("astronomyUpdatedAt", val);
+    }
+
+    public function setAstronomyData(val as Array<Array<Number> >?) as Void {
+        Application.Storage.setValue("astronomyData", val);
+    }
+
     public function setWaveData(val as Array<Array<Number?> >?) as Void {
         Application.Storage.setValue("waveData", val);
     }
@@ -217,6 +228,20 @@ module AppStorage {
     }
     public function setTideExtremesUpdatedAt(val as Number) as Void {
         AppStorageBG.setTideExtremesUpdatedAt(val);
+    }
+
+    public function getAstronomyUpdatedAt() as Number? {
+        return AppStorageBG.getAstronomyUpdatedAt();
+    }
+    public function setAstronomyUpdatedAt(val as Number) as Void {
+        AppStorageBG.setAstronomyUpdatedAt(val);
+    }
+
+    public function setAstronomyData(val as Array<Array<Number> >?) as Void {
+        AppStorageBG.setAstronomyData(val);
+    }
+    public function getAstronomyData() as Array<Array<Number> >? {
+        return Application.Storage.getValue("astronomyData") as Array<Array<Number> >?;
     }
 
     public function setWaveData(val as Array<Array<Number?> >?) as Void {
@@ -347,6 +372,8 @@ module AppStorage {
         clearWeatherUpdatedAt();
         clearTideTimelineUpdatedAt();
         clearTideExtremesUpdatedAt();
+        clearAstronomyUpdatedAt();
+        clearAstronomyData();
         clearNextSyncTime();
         clearTideStationName();
         clearTideStationCountry();
@@ -361,6 +388,12 @@ module AppStorage {
     }
     public function clearWaveData() as Void {
         Application.Storage.setValue("waveData", null);
+    }
+    public function clearAstronomyUpdatedAt() as Void {
+        Application.Storage.deleteValue("astronomyUpdatedAt");
+    }
+    public function clearAstronomyData() as Void {
+        Application.Storage.setValue("astronomyData", null);
     }
     public function clearTideStationName() as Void {
         Application.Storage.deleteValue("tideStationName");
