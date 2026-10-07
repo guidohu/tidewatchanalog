@@ -401,4 +401,15 @@ module AppStorage {
     public function clearTideStationCountry() as Void {
         Application.Storage.deleteValue("tideStationCountry");
     }
+
+    // Set once KiezelPay confirms a license/purchase. Checked before ever talking to
+    // KiezelPay again, so a user who already paid is never re-prompted (KiezelPay's
+    // own isLicensed() has been observed to flip back to false after a while).
+    public function getIsPurchased() as Boolean {
+        var val = Application.Storage.getValue("isPurchased");
+        return (val instanceof Boolean) && (val as Boolean);
+    }
+    public function setIsPurchased(val as Boolean) as Void {
+        Application.Storage.setValue("isPurchased", val);
+    }
 }

@@ -1778,18 +1778,27 @@ class TideWatchView extends WatchUi.WatchFace {
 
     /**
      * Instantiates or destroys the KiezelPay Core controller based on settings.
+     * Once a purchase has been confirmed, the result is persisted to storage and
+     * KiezelPay is never consulted again (see AppStorage.getIsPurchased): some users
+     * saw isLicensed() flip back to false after a while and get re-prompted to pay
+     * for an app they already own.
      */
     function initializeKPay(enableKPay as Boolean) as Boolean {
         var kpayChanged = false;
-        if (enableKPay) {
+        if (enableKPay && !AppStorage.getIsPurchased()) {
             var kpayInstance = kpay;
             if (kpayInstance == null) {
                 kpayInstance = new KPay.Core(getKPayConfig());
                 kpay = kpayInstance;
                 kpayChanged = true;
             }
-            System.println("KiezelPay isLicensed: " + kpayInstance.isLicensed());
-            if (!kpayInstance.isLicensed()) {
+            var isLicensed = kpayInstance.isLicensed();
+            System.println("KiezelPay isLicensed: " + isLicensed);
+            if (isLicensed) {
+                AppStorage.setIsPurchased(true);
+                kpay = null;
+                kpayChanged = true;
+            } else {
                 kpayInstance.startPurchase();
             }
         } else {
@@ -1854,16 +1863,26 @@ class TideWatchView extends WatchUi.WatchFace {
         logMemoryUsage();
         
         if (kpay != null && data instanceof Dictionary) {
-            kpay.onBackgroundData(data as Dictionary);
+            var kpayInstance = kpay as KPay.Core;
+            kpayInstance.onBackgroundData(data as Dictionary);
 
             var event = data.get("kpay_event");
             if (event instanceof Dictionary) {
                 var kpayStatus = event.get("status");
                 System.println("KiezelPay background event status: " + kpayStatus);
             }
-            System.println("KiezelPay isLicensed after sync: " + kpay.isLicensed());
+            var isLicensed = kpayInstance.isLicensed();
+            System.println("KiezelPay isLicensed after sync: " + isLicensed);
 
-            var response = (data as Dictionary)[(kpay as KPay.Core).extraResponseKey];
+            var response = (data as Dictionary)[kpayInstance.extraResponseKey];
+
+            if (isLicensed) {
+                // Purchase confirmed via background sync: persist it and drop the
+                // KiezelPay instance so we stop calling it from here on.
+                AppStorage.setIsPurchased(true);
+                kpay = null;
+            }
+
             if (response instanceof Boolean && response as Boolean) {
                 AppStorage.setDataUpdatedAt(Time.now().value());
                 WatchUi.requestUpdate();

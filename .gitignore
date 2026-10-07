@@ -11,6 +11,8 @@ internal-mir/
 
 # Private Developer Key (CRITICAL: Do not commit your developer key!)
 developer_key
+developer_key.pem
+developer_key.der
 skills/
 
 # Local IDE and OS Settings
