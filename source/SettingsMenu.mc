@@ -306,6 +306,7 @@ class LocationOptionMenuDelegate extends WatchUi.Menu2InputDelegate {
                 var lon = latLon[1].toFloat();
                 Application.Properties.setValue("GpsLat", lat);
                 Application.Properties.setValue("GpsLon", lon);
+                AppStorage.setTargetLocation(lat, lon);
                 AppStorage.clearSpotName();
                 _parentItem.setSubLabel(lat.format("%.4f") + ", " + lon.format("%.4f"));
                 

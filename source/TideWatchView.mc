@@ -56,15 +56,11 @@ class TideWatchView extends WatchUi.WatchFace {
     const LAYOUT_TIDE_HEIGHT_R = 0.77;
     const LAYOUT_MESSAGE_R = 0.35;
 
-    // Moon phase indicator: a small circle in the gap between the location and swell
-    // summary rows, offset to the left of center (mirroring how battery/day-date
-    // flank the dial center left/right) so it never collides with either centered
-    // text row. Only drawn on devices with enough background memory to have synced
-    // astronomy data in the first place.
-    const LAYOUT_MOON_Y_R = -0.65;
-    const MOON_CIRCLE_X_R = 0.70;
-    const MOON_CIRCLE_RADIUS_PX = 9;
-    const SUNRISE_SUNSET_COLOR = 0xFF8800;
+    // Moon phase indicator: a small circle sitting just right of the battery at the
+    // 9 o'clock position, sized to the battery icon's height. Only drawn on devices
+    // with enough background memory to have synced astronomy data in the first place.
+    const MOON_CIRCLE_RADIUS_PX = 6;
+    const MOON_BATTERY_GAP_PX = 6;
 
     // Dial ring: ticks live between these radii. The day/date block is right-justified
     // just inside the 3 o'clock tick and the battery is left-justified opposite it,
@@ -178,6 +174,7 @@ class TideWatchView extends WatchUi.WatchFace {
         var location = readLocation();
         mLastGpsLat = location[0];
         mLastGpsLon = location[1];
+        AppStorage.setTargetLocation(mLastGpsLat, mLastGpsLon);
         mLastDatum = Application.Properties.getValue("TideDatum");
         var apiKeyVal = Application.Properties.getValue("StormglassApiKey");
         mLastApiKey = (apiKeyVal instanceof String) ? apiKeyVal as String : "";
@@ -358,7 +355,7 @@ class TideWatchView extends WatchUi.WatchFace {
         var gpsLon = mLastGpsLon as Application.Properties.ValueType;
 
         if (!LocationUtils.isLocationSetAndValid(gpsLat, gpsLon)) {
-             drawDialInfo(dc, baseColor);
+             drawDialInfo(dc, baseColor, now);
 
              var msg = WatchUi.loadResource(Rez.Strings.NoSpotSelected) as String;
              if (mLastDataUpdatedAt > 0) {
@@ -372,7 +369,7 @@ class TideWatchView extends WatchUi.WatchFace {
         }
 
         if (mcTideData == null) {
-            drawDialInfo(dc, baseColor);
+            drawDialInfo(dc, baseColor, now);
 
             var msg = "Waiting for sync...\nFirst sync can take\nup to 15 minutes.";
             if (mSyncError != null) {
@@ -399,18 +396,12 @@ class TideWatchView extends WatchUi.WatchFace {
             drawSwellData(dc, baseColor, hasApiKey);
         }
 
-        // Moon Phase Indicator (only populated on devices with enough background
-        // memory to have synced astronomy data; no-ops otherwise)
-        if (!mInLowPowerMode) {
-            drawMoonPhase(dc, baseColor, now);
-        }
-
         // Graph Section
         drawGraphs(dc, graphColor, baseColor, mCachedShowSwellGraph, now);
 
         // Battery and day/date flank the dial center, where the top of the graph
         // reaches, so they are drawn once the graph is down.
-        drawDialInfo(dc, baseColor);
+        drawDialInfo(dc, baseColor, now);
 
         // Next Extrema (drawn between the graph and the tide height)
         if (mNextExtremaStr != null && !mInLowPowerMode) {
@@ -440,13 +431,15 @@ class TideWatchView extends WatchUi.WatchFace {
      * battery opposite it at 9 o'clock.
      * @param dc The device context.
      * @param baseColor Numeric color code for standard drawing.
+     * @param now Current epoch timestamp.
      */
-    function drawDialInfo(dc as Dc, baseColor as Number) as Void {
+    function drawDialInfo(dc as Dc, baseColor as Number, now as Number) as Void {
         if (mCachedShowDate || mInLowPowerMode) {
             drawDayDate(dc, baseColor);
         }
         if (!mInLowPowerMode) {
-            drawBattery(dc, baseColor);
+            var batteryRightX = drawBattery(dc, baseColor);
+            drawMoonPhase(dc, baseColor, now, batteryRightX);
         }
     }
 
@@ -480,6 +473,7 @@ class TideWatchView extends WatchUi.WatchFace {
 
             mcTideExtrema = AppStorage.getTideExtrema();
             mcAstronomyData = AppStorage.getAstronomyData();
+            System.println("DEBUG-ASTRO view loaded astronomy data: " + mcAstronomyData);
             mcWaveData = AppStorage.getWaveData();
             mcTideUnitApi = AppStorage.getTideUnitApi();
             mcSwellUnitApi = AppStorage.getSwellUnitApi();
@@ -724,8 +718,9 @@ class TideWatchView extends WatchUi.WatchFace {
      * the 9 o'clock tick so it mirrors the day/date block.
      * @param dc The device context.
      * @param baseColor Numeric color code for regular drawing.
+     * @return The x coordinate of the right edge of the battery block.
      */
-    function drawBattery(dc as Dc, baseColor as Number) as Void {
+    function drawBattery(dc as Dc, baseColor as Number) as Number {
         var startX = (mCenterX - mDialRadius * DIAL_BATTERY_R).toNumber();
         var y = mCenterY.toNumber();
         var width = (24 * mScale).toNumber();
@@ -760,12 +755,16 @@ class TideWatchView extends WatchUi.WatchFace {
 
         // The fill already conveys the level, so spell the number out only once it
         // drops into the warning range and the exact value starts to matter.
+        var rightX = startX + width + tipWidth;
         if (isLow) {
             var font = mBatteryFont != null ? mBatteryFont : ((mFontAssistantSmall != null) ? mFontAssistantSmall : Graphics.FONT_XTINY);
             var percStr = mBattery.toNumber().toString() + "%";
-            dc.drawText(startX + width + tipWidth + (4 * mScale).toNumber(), y, font, percStr,
+            var textX = rightX + (4 * mScale).toNumber();
+            dc.drawText(textX, y, font, percStr,
                         Graphics.TEXT_JUSTIFY_LEFT | Graphics.TEXT_JUSTIFY_VCENTER);
+            rightX = textX + dc.getTextWidthInPixels(percStr, font);
         }
+        return rightX;
     }
 
     /**
@@ -1027,16 +1026,20 @@ class TideWatchView extends WatchUi.WatchFace {
     }
 
     /**
-     * Draws a small circle that fills vertically from empty (new moon) to full (full
-     * moon) proportional to the current moon illumination. Picks the stored
-     * astronomy day whose timestamp is closest to now, converts its lunar-cycle
-     * phase to an illuminated fraction, and no-ops if no astronomy data has been
-     * synced (e.g. on a device below the background memory budget for this feature).
+     * Draws a small moon icon showing the lit part of the disc the way it appears in
+     * the sky: in the northern hemisphere a waxing moon is lit from the right and a
+     * waning moon keeps its left side lit; the southern hemisphere is mirrored. The
+     * terminator is an ellipse whose half-width is r * cos(2 * PI * phase). Picks the
+     * stored astronomy day whose timestamp is closest to now, and no-ops if no
+     * astronomy data has been synced (e.g. on a device below the background memory
+     * budget for this feature).
      * @param dc The device context.
      * @param baseColor Numeric color code for standard drawing.
      * @param now Current epoch timestamp.
+     * @param leftX The x coordinate the indicator is placed to the right of (the
+     *              battery block's right edge).
      */
-    function drawMoonPhase(dc as Dc, baseColor as Number, now as Number) as Void {
+    function drawMoonPhase(dc as Dc, baseColor as Number, now as Number, leftX as Number) as Void {
         if (mcAstronomyData == null || mcAstronomyData.size() == 0) {
             return;
         }
@@ -1060,24 +1063,40 @@ class TideWatchView extends WatchUi.WatchFace {
 
         var mpScaled = closest[3] as Number;
         var phase = mpScaled / 10000.0;
-        var illum = (1.0 - Math.cos(2.0 * Math.PI * phase)) / 2.0;
+        var terminator = Math.cos(2.0 * Math.PI * phase);
+        var waxing = phase < 0.5;
+        var mirror = (mLastGpsLat != null && (mLastGpsLat as Float) < 0.0);
 
         var r = (MOON_CIRCLE_RADIUS_PX * mScale).toNumber();
         if (r < 4) {
             r = 4;
         }
-        var cx = (mCenterX - mDialRadius * MOON_CIRCLE_X_R).toNumber();
-        var cy = dialY(LAYOUT_MOON_Y_R).toNumber();
+        var cx = leftX + (MOON_BATTERY_GAP_PX * mScale).toNumber() + r;
+        var cy = mCenterY.toNumber();
         var color = dimmed(baseColor);
 
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         dc.drawCircle(cx, cy, r);
 
-        var fillHeight = (2 * r * illum).toNumber();
-        if (fillHeight > 0) {
-            dc.setClip(cx - r, cy + r - fillHeight, 2 * r, fillHeight);
-            dc.fillCircle(cx, cy, r);
-            dc.clearClip();
+        // Fill the lit part row by row, between the terminator and the lit limb.
+        for (var dy = -r; dy <= r; dy++) {
+            var w = Math.sqrt(r * r - dy * dy);
+            var x0, x1;
+            if (waxing) {
+                x0 = w * terminator;
+                x1 = w;
+            } else {
+                x0 = -w;
+                x1 = -w * terminator;
+            }
+            if (mirror) {
+                var t = x0;
+                x0 = -x1;
+                x1 = -t;
+            }
+            if (x1 - x0 >= 0.5) {
+                dc.drawLine(cx + Math.round(x0).toNumber(), cy + dy, cx + Math.round(x1).toNumber() + 1, cy + dy);
+            }
         }
     }
 
@@ -1341,10 +1360,10 @@ class TideWatchView extends WatchUi.WatchFace {
                         var sunriseTs = astroRow[1] as Number;
                         var sunsetTs = astroRow[2] as Number;
                         if (sunriseTs >= mMinT && sunriseTs <= mMaxT) {
-                            drawGraphTimeMarker(targetDc, graphMargin, drawWidth, graphY, graphHeight, sunriseTs, SUNRISE_SUNSET_COLOR, use24HourMarker);
+                            drawGraphTimeMarker(targetDc, graphMargin, drawWidth, graphY, graphHeight, drawYOffset, sunriseTs, Graphics.COLOR_LT_GRAY, use24HourMarker);
                         }
                         if (sunsetTs >= mMinT && sunsetTs <= mMaxT) {
-                            drawGraphTimeMarker(targetDc, graphMargin, drawWidth, graphY, graphHeight, sunsetTs, SUNRISE_SUNSET_COLOR, use24HourMarker);
+                            drawGraphTimeMarker(targetDc, graphMargin, drawWidth, graphY, graphHeight, drawYOffset, sunsetTs, Graphics.COLOR_LT_GRAY, use24HourMarker);
                         }
                     }
                 }
@@ -1399,11 +1418,13 @@ class TideWatchView extends WatchUi.WatchFace {
      * @param drawWidth Drawable width of the graph.
      * @param graphY Y coordinate of the graph's baseline.
      * @param graphHeight Height of the graph band.
+     * @param yOffset Screen y of the target's origin (non-zero when drawing into the
+     *                cached graph bitmap), used to map back to screen space.
      * @param ts Epoch timestamp to mark.
      * @param color Numeric color code for the marker.
      * @param use24Hour True to format the label in 24-hour time.
      */
-    function drawGraphTimeMarker(dc as Dc, graphMargin as Float, drawWidth as Number, graphY as Float, graphHeight as Float, ts as Number, color as Number, use24Hour as Boolean) as Void {
+    function drawGraphTimeMarker(dc as Dc, graphMargin as Float, drawWidth as Number, graphY as Float, graphHeight as Float, yOffset as Number, ts as Number, color as Number, use24Hour as Boolean) as Void {
         var cx = graphMargin + drawWidth * (ts - mMinT).toFloat() / (mMaxT - mMinT).toFloat();
         dc.setColor(color, Graphics.COLOR_TRANSPARENT);
         var dashLen = (4 * mScale).toNumber();
@@ -1421,7 +1442,7 @@ class TideWatchView extends WatchUi.WatchFace {
         var hourAmPm = formatHourAmPm(info.hour, use24Hour, false);
         var label = hourAmPm[0].format(use24Hour ? "%02d" : "%d") + ":" + info.min.format("%02d") + hourAmPm[1];
         var font = mGraphLabelFont != null ? mGraphLabelFont : ((mFontAssistantSmall != null) ? mFontAssistantSmall : Graphics.FONT_XTINY);
-        if (cx < getRightEdgeX(startY) - (40 * mScale)) {
+        if (cx < getRightEdgeX(startY + yOffset) - (40 * mScale)) {
             dc.drawText(cx.toNumber(), startY.toNumber(), font, label, Graphics.TEXT_JUSTIFY_CENTER);
         }
     }
@@ -1843,6 +1864,7 @@ class TideWatchView extends WatchUi.WatchFace {
 
         mLastGpsLat = gpsLat;
         mLastGpsLon = gpsLon;
+        AppStorage.setTargetLocation(gpsLat, gpsLon);
         mLastDatum = curDatum;
         mLastApiKey = curApiKey;
 

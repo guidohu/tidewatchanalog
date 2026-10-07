@@ -11,6 +11,13 @@ module AppStorageBG {
         return Application.Storage.getValue("forecastStartOffsetSec") as Number?;
     }
 
+    // The background process can keep seeing stale Application.Properties values
+    // after the user edits the settings, so the foreground hands the sanitized
+    // coordinates over through Storage, which both processes share.
+    public function getTargetLocation() as Array<Float>? {
+        return Application.Storage.getValue("targetLocation") as Array<Float>?;
+    }
+
     public function getForecastWindowSec() as Number? {
         return Application.Storage.getValue("forecastWindowSec") as Number?;
     }
@@ -148,6 +155,10 @@ module AppStorage {
     }
     public function setAppId(val as String) as Void {
         Application.Storage.setValue("AppId", val);
+    }
+
+    public function setTargetLocation(lat as Float, lon as Float) as Void {
+        Application.Storage.setValue("targetLocation", [lat, lon] as Array<Float>);
     }
 
     public function getForecastStartOffsetSec() as Number? {

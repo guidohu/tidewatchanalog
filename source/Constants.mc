@@ -7,7 +7,10 @@ module ConstantsBG {
     const FAST_SYNC_FRESHNESS_THRESHOLD_SEC = 1800; // 30 minutes
     const SLOW_SYNC_FRESHNESS_THRESHOLD_SEC = 21600; // 6 hours
     const ASTRONOMY_FRESHNESS_THRESHOLD_SEC = 43200; // 12 hours
-    const ASTRONOMY_MIN_BACKGROUND_MEMORY_BYTES = 65536; // 64KB
+    // Background tasks get either a 32KB or a 64KB budget depending on the device.
+    // getSystemStats().totalMemory reports the heap left after the code is loaded, so
+    // a 64KB device never reports the full 65536; gate on anything above the 32KB tier.
+    const ASTRONOMY_MIN_BACKGROUND_MEMORY_BYTES = 32768; // 32KB, exclusive
 }
 
 module Constants {

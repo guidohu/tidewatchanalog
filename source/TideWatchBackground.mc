@@ -56,10 +56,10 @@ class TideWatchBackground extends System.ServiceDelegate {
      * sync astronomy data (moon phase, sunrise/sunset) without risking the core tide
      * sync on constrained devices. This is a runtime check of the actual background
      * task memory, independent of the compile-time 48h/12h forecast window tier.
-     * @return True if the background task has at least 64KB of total memory.
+     * @return True if the background task has more than the 32KB tier's memory.
      */
     function hasAstronomyMemoryBudget() as Boolean {
-        return System.getSystemStats().totalMemory >= ConstantsBG.ASTRONOMY_MIN_BACKGROUND_MEMORY_BYTES;
+        return System.getSystemStats().totalMemory > ConstantsBG.ASTRONOMY_MIN_BACKGROUND_MEMORY_BYTES;
     }
 
     /**
@@ -77,8 +77,16 @@ class TideWatchBackground extends System.ServiceDelegate {
 
         mApiKey = Application.Properties.getValue("StormglassApiKey") as String?;
 
+        // Prefer the coordinates the foreground handed over via Storage: properties
+        // read here can be stale after a settings change. Fall back to the properties
+        // until the foreground has run once with this version.
         var gpsLat = Application.Properties.getValue("GpsLat") as $.Toybox.Application.Properties.ValueType;
         var gpsLon = Application.Properties.getValue("GpsLon") as $.Toybox.Application.Properties.ValueType;
+        var targetLocation = AppStorageBG.getTargetLocation();
+        if (targetLocation != null && targetLocation.size() == 2) {
+            gpsLat = targetLocation[0];
+            gpsLon = targetLocation[1];
+        }
 
         if (LocationUtilsBG.isLocationSetAndValid(gpsLat, gpsLon)) {
             mTargetLat = LocationUtilsBG.getAsFloat(gpsLat);
@@ -126,6 +134,7 @@ class TideWatchBackground extends System.ServiceDelegate {
         var tideTimelineNeed = !isFresh(AppStorageBG.getTideTimelineUpdatedAt(), ConstantsBG.FAST_SYNC_FRESHNESS_THRESHOLD_SEC);
         var tideExtremesNeed = !isFresh(AppStorageBG.getTideExtremesUpdatedAt(), ConstantsBG.FAST_SYNC_FRESHNESS_THRESHOLD_SEC);
         var astronomyNeed = hasAstronomyMemoryBudget() && !isFresh(AppStorageBG.getAstronomyUpdatedAt(), ConstantsBG.ASTRONOMY_FRESHNESS_THRESHOLD_SEC);
+        System.println("DEBUG-ASTRO onTemporalEvent: totalMemory=" + System.getSystemStats().totalMemory + " budgetOk=" + hasAstronomyMemoryBudget() + " astronomyUpdatedAt=" + AppStorageBG.getAstronomyUpdatedAt() + " astronomyNeed=" + astronomyNeed + " geocodeNeed=" + geocodeNeed + " weatherNeed=" + weatherNeed + " tideTimelineNeed=" + tideTimelineNeed + " tideExtremesNeed=" + tideExtremesNeed);
 
         if (geocodeNeed || weatherNeed || tideTimelineNeed || tideExtremesNeed || astronomyNeed) {
             // System.println("Starting sync process with makePingRequest().");
@@ -638,7 +647,9 @@ class TideWatchBackground extends System.ServiceDelegate {
      * decorative overlay that must never block or break the core tide sync.
      */
     function makeAstronomyRequest() as Void {
+        System.println("DEBUG-ASTRO makeAstronomyRequest: totalMemory=" + System.getSystemStats().totalMemory + " budgetOk=" + hasAstronomyMemoryBudget() + " fresh=" + isFresh(AppStorageBG.getAstronomyUpdatedAt(), ConstantsBG.ASTRONOMY_FRESHNESS_THRESHOLD_SEC));
         if (!hasAstronomyMemoryBudget() || isFresh(AppStorageBG.getAstronomyUpdatedAt(), ConstantsBG.ASTRONOMY_FRESHNESS_THRESHOLD_SEC)) {
+            System.println("DEBUG-ASTRO skipping astronomy request");
             finalizeSync();
             return;
         }
@@ -650,7 +661,7 @@ class TideWatchBackground extends System.ServiceDelegate {
             "date" => Time.now().value()
         };
         var options = getRequestOptions(false);
-        // System.println("Requesting Astronomy with: " + url + " parameters: " + params);
+        System.println("DEBUG-ASTRO requesting: " + url + " params: " + params);
         Communications.makeWebRequest(url, params, options, method(:onReceiveAstronomy));
     }
 
@@ -663,6 +674,7 @@ class TideWatchBackground extends System.ServiceDelegate {
      * @param data Parsed JSON response dictionary.
      */
     function onReceiveAstronomy(responseCode as Number, data as Dictionary?) as Void {
+        System.println("DEBUG-ASTRO response code=" + responseCode + " data=" + data);
         if (responseCode != 200) {
             System.println("ERROR: Astronomy failed with response code: " + responseCode + ", data: " + data);
             finalizeSync();
@@ -700,6 +712,7 @@ class TideWatchBackground extends System.ServiceDelegate {
                     AppStorageBG.setAstronomyUpdatedAt(Time.now().value());
                     mDataUpdatedThisRun = true;
                 }
+                System.println("DEBUG-ASTRO stored rows=" + count + " of " + daysSize);
                 rows = null;
             }
         }
