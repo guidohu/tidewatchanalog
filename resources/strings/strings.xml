@@ -34,6 +34,7 @@
     <string id="HandColorTitle">Hands Color</string>
     <string id="SecondHandColorTitle">Second Hand Color</string>
     <string id="ShowDateTitle">Show Date and Day</string>
+    <string id="ShowMoonAndSunTitle">Show Moon &amp; Sun</string>
     <string id="TimeFormatTitle">Time Format</string>
     <string id="Format24Hour">24 Hours</string>
     <string id="Format12Hour">12 Hours</string>

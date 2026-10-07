@@ -28,6 +28,7 @@ class TideWatchView extends WatchUi.WatchFace {
     var mCachedShowSwellGraph as Boolean = false;
     var mCachedShowSwellSummary as Boolean = false;
     var mCachedShowDate as Boolean = true;
+    var mCachedShowMoonAndSun as Boolean = true;
     var mCachedTimeFormatVal as Number = 0;
 
     const METERS_TO_FEET = 3.28084;
@@ -197,6 +198,7 @@ class TideWatchView extends WatchUi.WatchFace {
         mCachedShowSwellGraph = Application.Properties.getValue("ShowSwellGraph") as Boolean;
         mCachedShowSwellSummary = Application.Properties.getValue("ShowSwellSummary") as Boolean;
         mCachedShowDate = Application.Properties.getValue("ShowDate") as Boolean;
+        mCachedShowMoonAndSun = Application.Properties.getValue("ShowMoonAndSun") as Boolean;
         mCachedTimeFormatVal = Application.Properties.getValue("TimeFormat") as Number;
     }
 
@@ -439,7 +441,9 @@ class TideWatchView extends WatchUi.WatchFace {
         }
         if (!mInLowPowerMode) {
             var batteryRightX = drawBattery(dc, baseColor);
-            drawMoonPhase(dc, baseColor, now, batteryRightX);
+            if (mCachedShowMoonAndSun) {
+                drawMoonPhase(dc, baseColor, now, batteryRightX);
+            }
         }
     }
 
@@ -1353,7 +1357,7 @@ class TideWatchView extends WatchUi.WatchFace {
                 // background memory to have synced astronomy data). A 48h graph window
                 // can span two calendar days, so every stored day's sunrise/sunset that
                 // falls inside the visible window gets its own marker.
-                if (mcAstronomyData != null) {
+                if (mCachedShowMoonAndSun && mcAstronomyData != null) {
                     var use24HourMarker = (mCachedTimeFormatVal == DataKeys.TIME_FORMAT_24_H);
                     for (var astroIdx = 0; astroIdx < mcAstronomyData.size(); astroIdx++) {
                         var astroRow = mcAstronomyData[astroIdx] as Array;

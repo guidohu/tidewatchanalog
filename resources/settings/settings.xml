@@ -114,6 +114,9 @@
         <setting propertyKey="@Properties.ShowDate" title="@Strings.ShowDateTitle">
             <settingConfig type="boolean" />
         </setting>
+        <setting propertyKey="@Properties.ShowMoonAndSun" title="@Strings.ShowMoonAndSunTitle">
+            <settingConfig type="boolean" />
+        </setting>
         <setting propertyKey="@Properties.TimeFormat" title="@Strings.TimeFormatTitle">
             <settingConfig type="list">
                 <listEntry value="0">@Strings.Format24Hour</listEntry>

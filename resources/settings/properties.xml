@@ -13,6 +13,7 @@
         <property id="HandColor" type="number">4</property> <!-- 4: White -->
         <property id="SecondHandColor" type="number">2</property> <!-- 2: Red -->
         <property id="ShowDate" type="boolean">true</property>
+        <property id="ShowMoonAndSun" type="boolean">true</property>
         <property id="TimeFormat" type="number">0</property>
         <property id="StormglassApiKey" type="string"></property>
         <property id="EnableKPay" type="boolean">true</property>
